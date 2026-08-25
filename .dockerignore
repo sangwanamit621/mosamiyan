@@ -1,0 +1,52 @@
+# Git
+.git
+.gitignore
+
+# Documentation & Spec notes (optional to keep out of runtime image)
+*.md
+!README.md
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+.pytest_cache
+.coverage
+htmlcov
+*.egg-info
+.venv
+venv
+ENV
+env
+
+# Secrets & Environment variables
+.env
+.env.*
+!.env.example
+
+# Database & Local storage
+postgres_data/
+redis_data/
+*.sqlite
+*.sqlite3
+*.db
+
+# Frontend build & artifacts
+node_modules
+.next
+out
+dist
+build
+*.log
+
+# IDE & OS files
+.vscode
+.idea
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
