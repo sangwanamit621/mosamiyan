@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mosamiyan_app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      APP_NAME: "Mosamiyan Weather Platform"
+      APP_ENV: production
+      PORT: 8000
+      DEBUG: "False"
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-mosamiyan}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/mosamiyan
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_URL: redis://redis:6379/0
+      DEFAULT_LAT: 28.6139
+      DEFAULT_LON: 77.2090
+      DEFAULT_CITY: New Delhi
+      DEFAULT_COUNTRY: IN
+      OPENWEATHERMAP_API_KEY: ${OPENWEATHERMAP_API_KEY:-}
+      WEATHERAPI_KEY: ${WEATHERAPI_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - mosamiyan_net
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: mosamiyan_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-mosamiyan}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-mosamiyan}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mosamiyan_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: mosamiyan_redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mosamiyan_net
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  mosamiyan_net:
+    driver: bridge

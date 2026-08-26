@@ -120,7 +120,7 @@ So that I can identify exact dry windows and reschedule activities around rain.
 
 #### 2.4 Business Logic & Display Rules
 
-- The hourly scrubber must always display times relative to the searched location's local timezone, not the user's current clock (e.g., viewing London from Tokyo shows London local time).
+- The hourly scrubber must always display times relative to the searched location's local timezone, not the user's current clock (e.g., viewing New Delhi from Tokyo shows New Delhi local time).
 
 - The 14-day list must visually highlight the current day with a distinct "Today" badge.
 
