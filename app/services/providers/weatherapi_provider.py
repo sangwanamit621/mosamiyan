@@ -14,6 +14,7 @@ from app.schemas.weather import (
     WindData,
 )
 from app.schemas.location import LocationSearchResult
+from app.services.http_client import get_http_client
 from app.services.providers.base_provider import BaseWeatherProvider
 from app.services.weather_utils import compute_lifestyle_indices, deg_to_cardinal, uv_to_category
 
@@ -46,10 +47,10 @@ class WeatherAPIProvider(BaseWeatherProvider):
                 "q": f"{lat},{lon}",
                 "aqi": "yes"
             }
-            async with httpx.AsyncClient(timeout=4.0) as client:
-                resp = await client.get(f"{self.BASE_URL}/current.json", params=params)
-                resp.raise_for_status()
-                data = resp.json()
+            client = get_http_client()
+            resp = await client.get(f"{self.BASE_URL}/current.json", params=params)
+            resp.raise_for_status()
+            data = resp.json()
 
             loc = data.get("location", {})
             cur = data.get("current", {})
