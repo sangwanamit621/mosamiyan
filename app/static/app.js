@@ -201,6 +201,20 @@ function renderCurrentWeather(data) {
     document.getElementById('location-name').innerText = displayName;
     document.getElementById('location-meta').innerText = `${loc.region ? loc.region + ', ' : ''}${loc.country || ''} • Timezone: ${loc.timezone}`;
 
+    // Format target location's current local time
+    try {
+        const targetLocalTime = new Intl.DateTimeFormat('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true,
+            timeZone: loc.timezone || undefined
+        }).format(new Date());
+        const localTimeElem = document.getElementById('local-time');
+        if (localTimeElem) localTimeElem.innerText = targetLocalTime;
+    } catch (e) {
+        console.debug("Local time formatting fallback:", e);
+    }
+
     // Hero
     document.getElementById('current-temp').innerText = `${Math.round(c.temp)}°`;
     document.getElementById('feels-like').innerText = `Feels like ${Math.round(c.feels_like)}°`;
@@ -248,9 +262,26 @@ function renderForecast(data) {
     const timeline = document.getElementById('hourly-timeline');
     timeline.innerHTML = '';
 
+    const targetTimezone = (data.location && data.location.timezone) ? data.location.timezone : undefined;
+
     (data.hourly || []).forEach(h => {
-        const timeObj = new Date(h.time);
-        const timeFormatted = isNaN(timeObj) ? h.time.split('T')[1] : timeObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        let timeFormatted = '';
+        try {
+            const timeObj = new Date(h.time);
+            if (!isNaN(timeObj)) {
+                timeFormatted = new Intl.DateTimeFormat('en-US', {
+                    hour: 'numeric',
+                    minute: 'numeric',
+                    hour12: true,
+                    timeZone: targetTimezone
+                }).format(timeObj);
+            } else {
+                timeFormatted = h.time.split('T')[1] || h.time;
+            }
+        } catch (e) {
+            timeFormatted = h.time.includes('T') ? h.time.split('T')[1].substring(0, 5) : h.time;
+        }
+
         const iconClass = getConditionIcon(h.condition_code);
 
         const card = document.createElement('div');

@@ -14,6 +14,7 @@ from app.schemas.weather import (
     WindData,
 )
 from app.schemas.location import LocationSearchResult
+from app.services.http_client import get_http_client
 from app.services.providers.base_provider import BaseWeatherProvider
 from app.services.weather_utils import compute_lifestyle_indices, deg_to_cardinal, uv_to_category
 
@@ -48,10 +49,10 @@ class OpenWeatherMapProvider(BaseWeatherProvider):
                 "appid": api_key,
                 "units": "metric"
             }
-            async with httpx.AsyncClient(timeout=4.0) as client:
-                resp = await client.get(f"{self.BASE_URL}/weather", params=params)
-                resp.raise_for_status()
-                data = resp.json()
+            client = get_http_client()
+            resp = await client.get(f"{self.BASE_URL}/weather", params=params)
+            resp.raise_for_status()
+            data = resp.json()
 
             main = data.get("main", {})
             wind = data.get("wind", {})
@@ -135,10 +136,10 @@ class OpenWeatherMapProvider(BaseWeatherProvider):
             return []
         try:
             params = {"q": query.strip(), "limit": 5, "appid": api_key}
-            async with httpx.AsyncClient(timeout=3.0) as client:
-                resp = await client.get(self.GEO_URL, params=params)
-                resp.raise_for_status()
-                data = resp.json()
+            client = get_http_client()
+            resp = await client.get(self.GEO_URL, params=params)
+            resp.raise_for_status()
+            data = resp.json()
 
             results: List[LocationSearchResult] = []
             for item in data:

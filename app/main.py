@@ -11,17 +11,20 @@ from app.api.v1.endpoints.weather import router as weather_router
 from app.config import get_settings
 from app.database import close_db_pool, init_db_pool
 from app.services.cache_service import close_redis_pool, init_redis_pool
+from app.services.http_client import close_http_client, init_http_client
 
 settings = get_settings()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Initialize DB and Redis connection pools
+    # Startup: Initialize DB, Redis, and HTTP client connection pools
     await init_db_pool()
     await init_redis_pool()
+    await init_http_client()
     yield
     # Shutdown: Cleanly close connection pools
+    await close_http_client()
     await close_db_pool()
     await close_redis_pool()
 

@@ -14,6 +14,7 @@ from app.schemas.weather import (
     WindData,
 )
 from app.schemas.location import LocationSearchResult
+from app.services.http_client import get_http_client
 from app.services.providers.base_provider import BaseWeatherProvider
 from app.services.weather_utils import (
     aqi_to_category,
@@ -72,25 +73,25 @@ class OpenMeteoProvider(BaseWeatherProvider):
                 "timezone": "auto"
             }
 
-            async with httpx.AsyncClient(timeout=4.0) as client:
-                resp = await client.get(self.FORECAST_URL, params=params)
-                resp.raise_for_status()
-                data = resp.json()
+            client = get_http_client()
+            resp = await client.get(self.FORECAST_URL, params=params)
+            resp.raise_for_status()
+            data = resp.json()
 
-                # Fetch Air Quality (non-blocking failure)
-                aqi_us = 35
-                pm2_5 = 8.0
-                pm10 = 12.0
-                try:
-                    aq_resp = await client.get(self.AIR_QUALITY_URL, params=aq_params)
-                    if aq_resp.status_code == 200:
-                        aq_data = aq_resp.json()
-                        current_aq = aq_data.get("current", {})
-                        aqi_us = int(current_aq.get("us_aqi") or 35)
-                        pm2_5 = float(current_aq.get("pm2_5") or 8.0)
-                        pm10 = float(current_aq.get("pm10") or 12.0)
-                except Exception as e:
-                    logger.debug(f"Air quality lookup failed: {e}")
+            # Fetch Air Quality (non-blocking failure)
+            aqi_us = 35
+            pm2_5 = 8.0
+            pm10 = 12.0
+            try:
+                aq_resp = await client.get(self.AIR_QUALITY_URL, params=aq_params)
+                if aq_resp.status_code == 200:
+                    aq_data = aq_resp.json()
+                    current_aq = aq_data.get("current", {})
+                    aqi_us = int(current_aq.get("us_aqi") or 35)
+                    pm2_5 = float(current_aq.get("pm2_5") or 8.0)
+                    pm10 = float(current_aq.get("pm10") or 12.0)
+            except Exception as e:
+                logger.debug(f"Air quality lookup failed: {e}")
 
             current = data.get("current", {})
             daily = data.get("daily", {})
@@ -199,10 +200,10 @@ class OpenMeteoProvider(BaseWeatherProvider):
                 "timezone": "auto"
             }
 
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                resp = await client.get(self.FORECAST_URL, params=params)
-                resp.raise_for_status()
-                data = resp.json()
+            client = get_http_client()
+            resp = await client.get(self.FORECAST_URL, params=params)
+            resp.raise_for_status()
+            data = resp.json()
 
             tz = data.get("timezone", "UTC")
             loc_name = tz.split("/")[-1].replace("_", " ") if "/" in tz else "Current Location"
@@ -304,10 +305,10 @@ class OpenMeteoProvider(BaseWeatherProvider):
                 "language": "en",
                 "format": "json"
             }
-            async with httpx.AsyncClient(timeout=3.0) as client:
-                resp = await client.get(self.GEOCODING_URL, params=params)
-                resp.raise_for_status()
-                data = resp.json()
+            client = get_http_client()
+            resp = await client.get(self.GEOCODING_URL, params=params)
+            resp.raise_for_status()
+            data = resp.json()
 
             results: List[LocationSearchResult] = []
             for item in data.get("results", []):
