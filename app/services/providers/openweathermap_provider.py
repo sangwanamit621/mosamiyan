@@ -14,6 +14,7 @@ from app.schemas.weather import (
     WindData,
 )
 from app.schemas.location import LocationSearchResult
+from app.schemas.alert import WeatherAlertsResponse
 from app.services.http_client import get_http_client
 from app.services.providers.base_provider import BaseWeatherProvider
 from app.services.weather_utils import compute_lifestyle_indices, deg_to_cardinal, uv_to_category
@@ -125,9 +126,13 @@ class OpenWeatherMapProvider(BaseWeatherProvider):
             return None
 
     async def get_forecast(
-        self, lat: float, lon: float, hourly_steps: int = 24, daily_steps: int = 7
+        self, lat: float, lon: float, hourly_steps: int = 48, daily_steps: int = 14
     ) -> Optional[ForecastResponse]:
         # OWM 5-day / 3-hour forecast fallback
+        return None
+
+    async def get_alerts(self, lat: float, lon: float) -> Optional[WeatherAlertsResponse]:
+        """OWM Alerts fallback handler."""
         return None
 
     async def search_locations(self, query: str) -> List[LocationSearchResult]:

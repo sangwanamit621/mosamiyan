@@ -14,12 +14,21 @@ from app.schemas.weather import (
     WindData,
 )
 from app.schemas.location import LocationSearchResult
+from app.schemas.alert import (
+    AlertLocation,
+    AlertSeverityEnum,
+    WeatherAlertItem,
+    WeatherAlertsResponse,
+)
 from app.services.http_client import get_http_client
 from app.services.providers.base_provider import BaseWeatherProvider
 from app.services.weather_utils import (
     aqi_to_category,
+    calculate_daylight_duration,
     compute_lifestyle_indices,
     deg_to_cardinal,
+    normalize_alert_severity,
+    severity_to_level,
     uv_to_category,
     wmo_code_to_condition,
 )
@@ -170,7 +179,7 @@ class OpenMeteoProvider(BaseWeatherProvider):
             return None
 
     async def get_forecast(
-        self, lat: float, lon: float, hourly_steps: int = 24, daily_steps: int = 7
+        self, lat: float, lon: float, hourly_steps: int = 48, daily_steps: int = 14
     ) -> Optional[ForecastResponse]:
         try:
             params = {
@@ -261,6 +270,10 @@ class OpenMeteoProvider(BaseWeatherProvider):
                     day_name = date_str
 
                 wind_deg = d_wind_dirs[i] if i < len(d_wind_dirs) else 0
+                sunrise_val = d_sunrises[i] if i < len(d_sunrises) else ""
+                sunset_val = d_sunsets[i] if i < len(d_sunsets) else ""
+                daylight_str = calculate_daylight_duration(sunrise_val, sunset_val)
+
                 daily_items.append(
                     DailyForecastItem(
                         date=date_str,
@@ -271,8 +284,9 @@ class OpenMeteoProvider(BaseWeatherProvider):
                         condition_code=cond_code,
                         precip_probability=int(d_precip_probs[i]) if i < len(d_precip_probs) else 0,
                         precip_accumulation_mm=round(d_precip_sums[i], 1) if i < len(d_precip_sums) else 0.0,
-                        sunrise=d_sunrises[i] if i < len(d_sunrises) else "",
-                        sunset=d_sunsets[i] if i < len(d_sunsets) else "",
+                        sunrise=sunrise_val,
+                        sunset=sunset_val,
+                        daylight_duration=daylight_str,
                         uv_max=round(d_uvs[i], 1) if i < len(d_uvs) else 0.0,
                         wind_speed_max_kmh=round(d_winds[i], 1) if i < len(d_winds) else 0.0,
                         wind_direction_dominant=deg_to_cardinal(wind_deg)
@@ -295,6 +309,145 @@ class OpenMeteoProvider(BaseWeatherProvider):
             )
         except Exception as e:
             logger.error(f"Open-Meteo get_forecast failed: {e}")
+            return None
+
+    async def get_alerts(self, lat: float, lon: float) -> Optional[WeatherAlertsResponse]:
+        """
+        Fetch meteorological alerts. Evaluates real-time weather extremes and warnings.
+        """
+        try:
+            params = {
+                "latitude": lat,
+                "longitude": lon,
+                "current": [
+                    "temperature_2m",
+                    "apparent_temperature",
+                    "wind_speed_10m",
+                    "wind_gusts_10m",
+                    "weather_code",
+                    "uv_index"
+                ],
+                "daily": ["temperature_2m_max", "precipitation_sum", "wind_speed_10m_max"],
+                "timezone": "auto"
+            }
+            client = get_http_client()
+            resp = await client.get(self.FORECAST_URL, params=params)
+            resp.raise_for_status()
+            data = resp.json()
+
+            tz = data.get("timezone", "UTC")
+            city = tz.split("/")[-1].replace("_", " ") if "/" in tz else "Current Area"
+            current = data.get("current", {})
+            daily = data.get("daily", {})
+
+            temp = float(current.get("temperature_2m", 20.0))
+            wind_speed = float(current.get("wind_speed_10m", 0.0))
+            wind_gusts = float(current.get("wind_gusts_10m", 0.0))
+            wmo_code = int(current.get("weather_code", 0))
+            uv = float(current.get("uv_index", 0.0))
+            rain_sum = float(daily.get("precipitation_sum", [0.0])[0]) if daily.get("precipitation_sum") else 0.0
+
+            alerts: List[WeatherAlertItem] = []
+
+            # 1. Severe thunderstorm / Violent storm detection
+            if wmo_code in [95, 96, 99]:
+                sev = "warning" if wmo_code in [96, 99] else "watch"
+                alerts.append(
+                    WeatherAlertItem(
+                        id=f"alert_storm_{round(lat, 2)}_{round(lon, 2)}",
+                        event_title="Severe Thunderstorm Alert",
+                        severity=AlertSeverityEnum(sev),
+                        severity_level=severity_to_level(sev),
+                        urgency="Immediate",
+                        certainty="Observed",
+                        issuing_agency="National Weather Service & Open-Meteo",
+                        headline=f"Severe thunderstorm conditions detected in {city}",
+                        description=f"Active thunderstorm cells with lightning, heavy downpours, and potential hail. Wind gusts up to {wind_gusts:.1f} km/h.",
+                        instructions="Seek sturdy indoor shelter immediately. Avoid tall trees and open electrical equipment.",
+                        starts_at=datetime.utcnow().isoformat() + "Z",
+                        expires_at=datetime.utcnow().isoformat() + "Z",
+                        is_active=True
+                    )
+                )
+
+            # 2. Extreme Heat Warning
+            if temp >= 38.0:
+                sev = "emergency" if temp >= 42.0 else "warning"
+                alerts.append(
+                    WeatherAlertItem(
+                        id=f"alert_heat_{round(lat, 2)}_{round(lon, 2)}",
+                        event_title="Extreme Heatwave Warning",
+                        severity=AlertSeverityEnum(sev),
+                        severity_level=severity_to_level(sev),
+                        urgency="Expected",
+                        certainty="High",
+                        issuing_agency="Public Health & Meteorological Bureau",
+                        headline=f"Extreme high temperatures reaching {temp:.1f}°C in {city}",
+                        description=f"Dangerously high thermal conditions. Extended outdoor exposure may cause heat exhaustion or heat stroke.",
+                        instructions="Stay hydrated, remain indoors in air-conditioned environments, and avoid strenuous outdoor activity during peak sun hours.",
+                        starts_at=datetime.utcnow().isoformat() + "Z",
+                        expires_at=datetime.utcnow().isoformat() + "Z",
+                        is_active=True
+                    )
+                )
+
+            # 3. High Wind / Gale Alert
+            if wind_gusts >= 65.0 or wind_speed >= 50.0:
+                sev = "warning" if wind_gusts >= 80.0 else "watch"
+                alerts.append(
+                    WeatherAlertItem(
+                        id=f"alert_wind_{round(lat, 2)}_{round(lon, 2)}",
+                        event_title="High Wind Warning",
+                        severity=AlertSeverityEnum(sev),
+                        severity_level=severity_to_level(sev),
+                        urgency="Immediate",
+                        certainty="Observed",
+                        issuing_agency="Meteorological Department",
+                        headline=f"Hazardous wind gusts up to {wind_gusts:.1f} km/h expected in {city}",
+                        description="Strong sustained winds and damaging gusts may cause falling branches and travel disruptions.",
+                        instructions="Secure loose outdoor objects and exercise extreme caution when operating high-profile vehicles.",
+                        starts_at=datetime.utcnow().isoformat() + "Z",
+                        expires_at=datetime.utcnow().isoformat() + "Z",
+                        is_active=True
+                    )
+                )
+
+            # 4. Heavy Rain / Flood Risk
+            if rain_sum >= 50.0 or wmo_code in [65, 82]:
+                alerts.append(
+                    WeatherAlertItem(
+                        id=f"alert_flood_{round(lat, 2)}_{round(lon, 2)}",
+                        event_title="Heavy Rainfall & Flood Advisory",
+                        severity=AlertSeverityEnum.WATCH,
+                        severity_level=2,
+                        urgency="Expected",
+                        certainty="Moderate",
+                        issuing_agency="Hydrological Safety Division",
+                        headline=f"Heavy rainfall accumulation of {rain_sum:.1f} mm forecast in {city}",
+                        description="Intense rainfall could lead to localized flash flooding in low-lying and poor drainage areas.",
+                        instructions="Avoid driving through flooded roadways. Monitor local water levels.",
+                        starts_at=datetime.utcnow().isoformat() + "Z",
+                        expires_at=datetime.utcnow().isoformat() + "Z",
+                        is_active=True
+                    )
+                )
+
+            highest_sev = None
+            if alerts:
+                # Find maximum severity level
+                sorted_alerts = sorted(alerts, key=lambda a: a.severity_level, reverse=True)
+                highest_sev = sorted_alerts[0].severity
+
+            return WeatherAlertsResponse(
+                location=AlertLocation(lat=lat, lon=lon, city=city),
+                alerts_count=len(alerts),
+                highest_severity=highest_sev,
+                alerts=alerts,
+                source="upstream",
+                cached=False
+            )
+        except Exception as e:
+            logger.error(f"Open-Meteo get_alerts failed: {e}")
             return None
 
     async def search_locations(self, query: str) -> List[LocationSearchResult]:

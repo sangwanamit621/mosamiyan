@@ -34,12 +34,12 @@ async def get_current_weather(
 async def get_forecast(
     lat: Optional[float] = Query(None, description="Latitude (-90 to 90)"),
     lon: Optional[float] = Query(None, description="Longitude (-180 to 180)"),
-    hourly_steps: int = Query(24, ge=1, le=48, description="Number of hourly steps (1-48)"),
-    daily_steps: int = Query(7, ge=1, le=14, description="Number of daily steps (1-14)"),
+    hourly_steps: int = Query(48, ge=1, le=48, description="Number of hourly steps (1-48)"),
+    daily_steps: int = Query(14, ge=1, le=16, description="Number of daily steps (1-16)"),
     units: str = Query("metric", description="Unit format: 'metric' or 'imperial'")
 ):
     """
-    Get combined hourly (24h/48h) and extended daily (7d/14d) forecasts.
+    Get combined hourly (up to 48h) and extended daily (up to 14d) forecasts.
     """
     latitude = lat if lat is not None else settings.DEFAULT_LAT
     longitude = lon if lon is not None else settings.DEFAULT_LON

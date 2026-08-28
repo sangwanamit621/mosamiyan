@@ -1,12 +1,31 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mosamiyan — Modern Weather Platform</title>
+
+    <!-- Zero-Flicker Theme Initialization & Configuration -->
+    <script>
+        window.CARTO_BASEMAPS_API_KEY = "{{ carto_api_key }}";
+        (function() {
+            const saved = localStorage.getItem('mosamiyan_theme');
+            if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        })();
+    </script>
+
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Leaflet.js Mapping Library -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -32,6 +51,10 @@
             -webkit-backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.3);
         }
+        .dark .glass {
+            background: rgba(15, 23, 42, 0.75);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+        }
         .scrollbar-none::-webkit-scrollbar {
             display: none;
         }
@@ -39,82 +62,167 @@
             -ms-overflow-style: none;
             scrollbar-width: none;
         }
+        /* Custom map styling */
+        #weather-map {
+            z-index: 10;
+        }
+        .leaflet-container {
+            font-family: inherit;
+        }
+        /* Pulse animations for alerts */
+        @keyframes subtle-pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.85; transform: scale(1.02); }
+        }
+        .animate-subtle-pulse {
+            animation: subtle-pulse 2.5s infinite ease-in-out;
+        }
     </style>
 </head>
-<body class="bg-gradient-to-br from-slate-900 via-sky-950 to-slate-900 text-slate-100 min-h-screen font-sans antialiased">
+<body class="bg-gradient-to-br from-slate-100 via-sky-50 to-slate-200 dark:from-slate-950 dark:via-sky-950 dark:to-slate-900 text-slate-800 dark:text-slate-100 min-h-screen font-sans antialiased transition-colors duration-300">
     
     <!-- Top Navigation -->
-    <header class="border-b border-sky-800/40 bg-slate-900/60 backdrop-blur-md sticky top-0 z-50">
+    <header class="border-b border-slate-200 dark:border-sky-800/40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md sticky top-0 z-50 transition-colors duration-300">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
             
             <!-- Logo -->
-            <div class="flex items-center space-x-3 cursor-pointer" onclick="resetToDefault()">
+            <div class="flex items-center space-x-3 cursor-pointer select-none" onclick="resetToDefault()">
                 <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-400 to-indigo-500 flex items-center justify-center shadow-lg shadow-sky-500/20">
                     <i class="fa-solid fa-cloud-bolt text-white text-lg"></i>
                 </div>
                 <div>
-                    <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-sky-400 to-teal-300 bg-clip-text text-transparent">Mosamiyan</h1>
-                    <p class="text-[10px] text-sky-400/80 font-medium uppercase tracking-wider">Weather Platform</p>
+                    <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-sky-500 to-teal-400 dark:from-sky-400 dark:to-teal-300 bg-clip-text text-transparent">Mosamiyan</h1>
+                    <p class="text-[10px] text-sky-600 dark:text-sky-400/80 font-medium uppercase tracking-wider">Weather Platform</p>
                 </div>
             </div>
 
             <!-- Omnibox Search -->
             <div class="relative flex-1 max-w-md">
                 <div class="relative">
-                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-sky-400/70 text-sm"></i>
+                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-sky-500 dark:text-sky-400/70 text-sm"></i>
                     <input 
                         type="text" 
                         id="city-search" 
                         placeholder="Search city, state, or airport..." 
                         autocomplete="off"
-                        class="w-full bg-slate-800/80 border border-sky-700/40 rounded-full pl-10 pr-10 py-2 text-sm text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-transparent transition-all"
+                        class="w-full bg-slate-100 dark:bg-slate-800/80 border border-slate-300 dark:border-sky-700/40 rounded-full pl-10 pr-10 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-transparent transition-all shadow-inner"
                     >
-                    <button id="clear-search" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs">
+                    <button id="clear-search" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white text-xs">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
                 </div>
                 <!-- Autocomplete Dropdown -->
-                <div id="search-results" class="hidden absolute left-0 right-0 top-12 bg-slate-800 border border-sky-700/50 rounded-2xl shadow-2xl overflow-hidden z-50 divide-y divide-slate-700/50 max-h-72 overflow-y-auto"></div>
+                <div id="search-results" class="hidden absolute left-0 right-0 top-12 bg-white dark:bg-slate-800 border border-slate-200 dark:border-sky-700/50 rounded-2xl shadow-2xl overflow-hidden z-50 divide-y divide-slate-100 dark:divide-slate-700/50 max-h-72 overflow-y-auto"></div>
             </div>
 
-            <!-- Actions (Geolocation & Unit Switcher) -->
-            <div class="flex items-center space-x-3">
-                <button id="geolocate-btn" title="Use Current Location" class="p-2.5 rounded-full bg-slate-800/80 hover:bg-sky-900/50 border border-sky-700/40 text-sky-400 transition-colors">
+            <!-- Actions (Geolocation, Unit Switcher & Theme Toggle) -->
+            <div class="flex items-center space-x-2 sm:space-x-3">
+                
+                <!-- Geolocation Trigger -->
+                <button id="geolocate-btn" title="Use Current Location" class="p-2.5 rounded-full bg-slate-100 dark:bg-slate-800/80 hover:bg-sky-100 dark:hover:bg-sky-900/50 border border-slate-300 dark:border-sky-700/40 text-sky-600 dark:text-sky-400 transition-colors">
                     <i class="fa-solid fa-location-crosshairs text-sm"></i>
                 </button>
                 
                 <!-- Unit Switcher -->
-                <div class="flex items-center bg-slate-800/80 border border-sky-700/40 rounded-full p-1 text-xs font-semibold">
+                <div class="flex items-center bg-slate-100 dark:bg-slate-800/80 border border-slate-300 dark:border-sky-700/40 rounded-full p-1 text-xs font-semibold">
                     <button id="unit-metric" class="px-2.5 py-1 rounded-full bg-sky-500 text-white transition-all">°C</button>
-                    <button id="unit-imperial" class="px-2.5 py-1 rounded-full text-slate-400 hover:text-white transition-all">°F</button>
+                    <button id="unit-imperial" class="px-2.5 py-1 rounded-full text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-all">°F</button>
                 </div>
+
+                <!-- Dark / Light Mode Switcher -->
+                <button id="theme-toggle-btn" title="Toggle Light / Dark Mode" class="p-2.5 rounded-full bg-slate-100 dark:bg-slate-800/80 hover:bg-amber-100 dark:hover:bg-slate-700/60 border border-slate-300 dark:border-sky-700/40 text-amber-500 dark:text-amber-300 transition-all">
+                    <i id="theme-icon" class="fa-solid fa-moon text-sm"></i>
+                </button>
             </div>
         </div>
     </header>
+
+    <!-- Global Severe Weather Alert Banner (Pinned) -->
+    <div id="alert-banner" class="hidden max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+        <div id="alert-banner-inner" class="rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg border animate-subtle-pulse">
+            <div class="flex items-center space-x-3">
+                <div id="alert-icon-wrap" class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-white font-bold">
+                    <i id="alert-banner-icon" class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <span id="alert-badge" class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full tracking-wider"></span>
+                        <span id="alert-agency" class="text-xs opacity-90 font-medium"></span>
+                    </div>
+                    <h4 id="alert-title" class="text-sm sm:text-base font-bold mt-0.5"></h4>
+                </div>
+            </div>
+            <button id="open-alert-modal-btn" class="px-4 py-1.5 rounded-xl bg-white/20 hover:bg-white/30 text-xs font-bold transition-all whitespace-nowrap self-end sm:self-center border border-white/30">
+                View Safety Details <i class="fa-solid fa-arrow-right ml-1"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Alert Details Modal -->
+    <div id="alert-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-sky-700/50 rounded-3xl max-w-2xl w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <button id="close-alert-modal" class="absolute top-5 right-5 text-slate-400 hover:text-slate-600 dark:hover:text-white text-lg">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <div class="flex items-center space-x-3 mb-4">
+                <div id="modal-alert-icon" class="w-10 h-10 rounded-2xl flex items-center justify-center text-white text-lg">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+                <div>
+                    <span id="modal-alert-severity" class="text-xs font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full"></span>
+                    <h3 id="modal-alert-title" class="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mt-1"></h3>
+                </div>
+            </div>
+
+            <div class="space-y-4 text-xs sm:text-sm text-slate-600 dark:text-slate-300">
+                <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/50 space-y-1">
+                    <p><strong class="text-slate-900 dark:text-white">Issuing Agency:</strong> <span id="modal-alert-agency"></span></p>
+                    <p><strong class="text-slate-900 dark:text-white">Active Period:</strong> <span id="modal-alert-timing"></span></p>
+                    <p><strong class="text-slate-900 dark:text-white">Headline:</strong> <span id="modal-alert-headline"></span></p>
+                </div>
+
+                <div>
+                    <h4 class="font-bold text-slate-900 dark:text-white mb-1">Hazard Description & Impact:</h4>
+                    <p id="modal-alert-desc" class="leading-relaxed bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl"></p>
+                </div>
+
+                <div id="modal-instructions-container">
+                    <h4 class="font-bold text-emerald-600 dark:text-emerald-400 mb-1"><i class="fa-solid fa-shield-halved mr-1"></i> Recommended Protective Actions:</h4>
+                    <p id="modal-alert-instructions" class="leading-relaxed bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/50 p-3.5 rounded-xl text-emerald-900 dark:text-emerald-200"></p>
+                </div>
+            </div>
+
+            <div class="mt-6 flex justify-end">
+                <button id="modal-close-btn" class="px-5 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-xs font-bold text-slate-800 dark:text-slate-100 transition-all">
+                    Dismiss
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- Main Container -->
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
         <!-- Favorites Bar -->
         <div class="flex items-center space-x-2 overflow-x-auto scrollbar-none pb-1">
-            <span class="text-xs font-medium text-slate-400 flex items-center gap-1.5 mr-2">
+            <span class="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mr-2 whitespace-nowrap">
                 <i class="fa-solid fa-star text-amber-400 text-[11px]"></i> Favorites:
             </span>
             <div id="favorites-container" class="flex items-center space-x-2">
-                <span class="text-xs text-slate-500 italic">No favorite cities saved</span>
+                <span class="text-xs text-slate-400 dark:text-slate-500 italic">No favorite cities saved</span>
             </div>
         </div>
 
         <!-- Location Header & Star Action -->
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-sky-800/30 pb-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 dark:border-sky-800/30 pb-4">
             <div>
                 <div class="flex items-center space-x-3">
-                    <h2 id="location-name" class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">Loading...</h2>
+                    <h2 id="location-name" class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Loading...</h2>
                     <button id="star-btn" class="text-slate-400 hover:text-amber-400 transition-colors text-xl" title="Save to Favorites">
                         <i class="fa-regular fa-star"></i>
                     </button>
                 </div>
-                <p id="location-meta" class="text-xs text-slate-400 mt-1">Local Time: <span id="local-time">--:--</span> • Updated: <span id="update-time">Just now</span></p>
+                <p id="location-meta" class="text-xs text-slate-500 dark:text-slate-400 mt-1">Local Time: <span id="local-time">--:--</span> • Updated: <span id="update-time">Just now</span></p>
             </div>
         </div>
 
@@ -122,185 +230,250 @@
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
             <!-- Hero Card -->
-            <div class="lg:col-span-1 bg-gradient-to-br from-sky-900/60 to-indigo-900/50 border border-sky-700/40 rounded-3xl p-6 relative overflow-hidden shadow-xl flex flex-col justify-between">
-                <div class="absolute -right-6 -bottom-6 text-sky-400/10 text-9xl pointer-events-none">
+            <div class="lg:col-span-1 bg-gradient-to-br from-sky-500/15 to-indigo-500/10 dark:from-sky-900/60 dark:to-indigo-900/50 border border-sky-300 dark:border-sky-700/40 rounded-3xl p-6 relative overflow-hidden shadow-xl flex flex-col justify-between transition-colors">
+                <div class="absolute -right-6 -bottom-6 text-sky-500/10 dark:text-sky-400/10 text-9xl pointer-events-none">
                     <i id="hero-bg-icon" class="fa-solid fa-cloud-sun"></i>
                 </div>
                 
                 <div>
-                    <span class="text-xs font-semibold uppercase tracking-wider text-sky-300">Current Conditions</span>
+                    <span class="text-xs font-semibold uppercase tracking-wider text-sky-600 dark:text-sky-300">Current Conditions</span>
                     <div class="flex items-baseline space-x-3 mt-4">
-                        <span id="current-temp" class="text-6xl sm:text-7xl font-extrabold text-white">--°</span>
-                        <span id="feels-like" class="text-sm font-medium text-sky-200">Feels like --°</span>
+                        <span id="current-temp" class="text-6xl sm:text-7xl font-extrabold text-slate-900 dark:text-white">--°</span>
+                        <span id="feels-like" class="text-sm font-medium text-sky-700 dark:text-sky-200">Feels like --°</span>
                     </div>
                     <div class="flex items-center space-x-2 mt-2">
-                        <i id="hero-weather-icon" class="fa-solid fa-cloud-sun text-sky-300 text-xl"></i>
-                        <span id="current-condition" class="text-lg font-semibold text-slate-100">Loading...</span>
+                        <i id="hero-weather-icon" class="fa-solid fa-cloud-sun text-sky-500 dark:text-sky-300 text-xl"></i>
+                        <span id="current-condition" class="text-lg font-semibold text-slate-800 dark:text-slate-100">Loading...</span>
                     </div>
                 </div>
 
-                <div class="mt-6 pt-4 border-t border-sky-700/40 flex items-center justify-between text-xs text-sky-200">
+                <div class="mt-6 pt-4 border-t border-sky-300 dark:border-sky-700/40 flex items-center justify-between text-xs text-sky-800 dark:text-sky-200">
                     <div>
-                        <span class="text-slate-400">High:</span> <span id="temp-high" class="font-bold text-white">--°</span>
+                        <span class="text-slate-500 dark:text-slate-400">High:</span> <span id="temp-high" class="font-bold text-slate-900 dark:text-white">--°</span>
                     </div>
                     <div>
-                        <span class="text-slate-400">Low:</span> <span id="temp-low" class="font-bold text-white">--°</span>
+                        <span class="text-slate-500 dark:text-slate-400">Low:</span> <span id="temp-low" class="font-bold text-slate-900 dark:text-white">--°</span>
                     </div>
                     <div>
-                        <span class="text-slate-400">Precip:</span> <span id="current-precip" class="font-bold text-white">0%</span>
+                        <span class="text-slate-500 dark:text-slate-400">Precip:</span> <span id="current-precip" class="font-bold text-slate-900 dark:text-white">0%</span>
                     </div>
                 </div>
             </div>
 
-            <!-- 9 Atmospheric Detail Cards (2x3 or 3x3 Grid) -->
+            <!-- 9 Atmospheric Detail Cards (3x3 Grid) -->
             <div class="lg:col-span-2 grid grid-cols-2 sm:grid-cols-3 gap-3.5">
                 
                 <!-- 1. Humidity & Dew Point -->
-                <div class="bg-slate-800/60 border border-sky-800/40 rounded-2xl p-4 flex flex-col justify-between">
-                    <div class="flex items-center justify-between text-slate-400 text-xs font-medium">
+                <div class="bg-white/80 dark:bg-slate-800/60 border border-slate-200 dark:border-sky-800/40 rounded-2xl p-4 flex flex-col justify-between shadow-sm">
+                    <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-medium">
                         <span>Humidity</span>
-                        <i class="fa-solid fa-droplet text-sky-400"></i>
+                        <i class="fa-solid fa-droplet text-sky-500 dark:text-sky-400"></i>
                     </div>
                     <div class="my-2">
-                        <span id="val-humidity" class="text-2xl font-bold text-white">--%</span>
+                        <span id="val-humidity" class="text-2xl font-bold text-slate-900 dark:text-white">--%</span>
                     </div>
-                    <span id="val-dewpoint" class="text-[11px] text-slate-400">Dew Point: --°</span>
+                    <span id="val-dewpoint" class="text-[11px] text-slate-500 dark:text-slate-400">Dew Point: --°</span>
                 </div>
 
                 <!-- 2. Wind & Direction -->
-                <div class="bg-slate-800/60 border border-sky-800/40 rounded-2xl p-4 flex flex-col justify-between">
-                    <div class="flex items-center justify-between text-slate-400 text-xs font-medium">
-                        <span>Wind</span>
-                        <i class="fa-solid fa-wind text-sky-400"></i>
+                <div class="bg-white/80 dark:bg-slate-800/60 border border-slate-200 dark:border-sky-800/40 rounded-2xl p-4 flex flex-col justify-between shadow-sm">
+                    <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-medium">
+                        <span>Wind Compass</span>
+                        <i class="fa-solid fa-wind text-sky-500 dark:text-sky-400"></i>
                     </div>
                     <div class="my-2 flex items-baseline gap-1">
-                        <span id="val-wind" class="text-2xl font-bold text-white">--</span>
-                        <span id="unit-wind" class="text-xs text-slate-400">km/h</span>
+                        <span id="val-wind" class="text-2xl font-bold text-slate-900 dark:text-white">--</span>
+                        <span id="unit-wind" class="text-xs text-slate-500 dark:text-slate-400">km/h</span>
                     </div>
-                    <span id="val-wind-dir" class="text-[11px] text-slate-400">Direction: -- (Gusts: --)</span>
+                    <span id="val-wind-dir" class="text-[11px] text-slate-500 dark:text-slate-400">Direction: -- (Gusts: --)</span>
                 </div>
 
                 <!-- 3. Pressure & Trend -->
-                <div class="bg-slate-800/60 border border-sky-800/40 rounded-2xl p-4 flex flex-col justify-between">
-                    <div class="flex items-center justify-between text-slate-400 text-xs font-medium">
+                <div class="bg-white/80 dark:bg-slate-800/60 border border-slate-200 dark:border-sky-800/40 rounded-2xl p-4 flex flex-col justify-between shadow-sm">
+                    <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-medium">
                         <span>Pressure</span>
-                        <i class="fa-solid fa-gauge-high text-sky-400"></i>
+                        <i class="fa-solid fa-gauge-high text-sky-500 dark:text-sky-400"></i>
                     </div>
                     <div class="my-2">
-                        <span id="val-pressure" class="text-2xl font-bold text-white">--</span>
-                        <span class="text-xs text-slate-400">hPa</span>
+                        <span id="val-pressure" class="text-2xl font-bold text-slate-900 dark:text-white">--</span>
+                        <span class="text-xs text-slate-500 dark:text-slate-400">hPa</span>
                     </div>
-                    <span id="val-pressure-trend" class="text-[11px] text-emerald-400">Steady</span>
+                    <span id="val-pressure-trend" class="text-[11px] text-emerald-600 dark:text-emerald-400">Steady</span>
                 </div>
 
                 <!-- 4. UV Index -->
-                <div class="bg-slate-800/60 border border-sky-800/40 rounded-2xl p-4 flex flex-col justify-between">
-                    <div class="flex items-center justify-between text-slate-400 text-xs font-medium">
+                <div class="bg-white/80 dark:bg-slate-800/60 border border-slate-200 dark:border-sky-800/40 rounded-2xl p-4 flex flex-col justify-between shadow-sm">
+                    <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-medium">
                         <span>UV Index</span>
-                        <i class="fa-solid fa-sun text-amber-400"></i>
+                        <i class="fa-solid fa-sun text-amber-500 dark:text-amber-400"></i>
                     </div>
                     <div class="my-2">
-                        <span id="val-uv" class="text-2xl font-bold text-white">--</span>
+                        <span id="val-uv" class="text-2xl font-bold text-slate-900 dark:text-white">--</span>
                     </div>
-                    <span id="val-uv-badge" class="text-[11px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 w-fit font-medium">Moderate</span>
+                    <span id="val-uv-badge" class="text-[11px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-300 w-fit font-medium">Moderate</span>
                 </div>
 
                 <!-- 5. Visibility & Cloud Cover -->
-                <div class="bg-slate-800/60 border border-sky-800/40 rounded-2xl p-4 flex flex-col justify-between">
-                    <div class="flex items-center justify-between text-slate-400 text-xs font-medium">
+                <div class="bg-white/80 dark:bg-slate-800/60 border border-slate-200 dark:border-sky-800/40 rounded-2xl p-4 flex flex-col justify-between shadow-sm">
+                    <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-medium">
                         <span>Visibility</span>
-                        <i class="fa-solid fa-eye text-sky-400"></i>
+                        <i class="fa-solid fa-eye text-sky-500 dark:text-sky-400"></i>
                     </div>
                     <div class="my-2">
-                        <span id="val-visibility" class="text-2xl font-bold text-white">--</span>
-                        <span id="unit-vis" class="text-xs text-slate-400">km</span>
+                        <span id="val-visibility" class="text-2xl font-bold text-slate-900 dark:text-white">--</span>
+                        <span id="unit-vis" class="text-xs text-slate-500 dark:text-slate-400">km</span>
                     </div>
-                    <span id="val-clouds" class="text-[11px] text-slate-400">Cloud cover: --%</span>
+                    <span id="val-clouds" class="text-[11px] text-slate-500 dark:text-slate-400">Cloud cover: --%</span>
                 </div>
 
                 <!-- 6. Air Quality Index -->
-                <div class="bg-slate-800/60 border border-sky-800/40 rounded-2xl p-4 flex flex-col justify-between">
-                    <div class="flex items-center justify-between text-slate-400 text-xs font-medium">
+                <div class="bg-white/80 dark:bg-slate-800/60 border border-slate-200 dark:border-sky-800/40 rounded-2xl p-4 flex flex-col justify-between shadow-sm">
+                    <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-medium">
                         <span>Air Quality (AQI)</span>
-                        <i class="fa-solid fa-lungs text-emerald-400"></i>
+                        <i class="fa-solid fa-lungs text-emerald-600 dark:text-emerald-400"></i>
                     </div>
                     <div class="my-2">
-                        <span id="val-aqi" class="text-2xl font-bold text-white">--</span>
+                        <span id="val-aqi" class="text-2xl font-bold text-slate-900 dark:text-white">--</span>
                     </div>
-                    <span id="val-aqi-badge" class="text-[11px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 w-fit font-medium">Good</span>
+                    <span id="val-aqi-badge" class="text-[11px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 w-fit font-medium">Good</span>
                 </div>
 
             </div>
         </div>
 
-        <!-- 24-Hour Hourly Scrubber -->
-        <div class="bg-slate-800/50 border border-sky-800/40 rounded-3xl p-6 shadow-xl">
+        <!-- 48-Hour Hourly Scrubber -->
+        <div class="bg-white/80 dark:bg-slate-800/50 border border-slate-200 dark:border-sky-800/40 rounded-3xl p-6 shadow-xl transition-colors">
             <div class="flex items-center justify-between mb-4">
                 <div class="flex items-center space-x-2">
-                    <i class="fa-solid fa-clock text-sky-400 text-sm"></i>
-                    <h3 class="text-base font-bold text-white">24-Hour Hourly Forecast</h3>
+                    <i class="fa-solid fa-clock text-sky-500 dark:text-sky-400 text-sm"></i>
+                    <h3 class="text-base font-bold text-slate-900 dark:text-white">48-Hour Hourly Timeline</h3>
                 </div>
-                <span class="text-xs text-slate-400">Scroll horizontally ➔</span>
+                <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">Scroll horizontally ➔</span>
             </div>
 
             <!-- Horizontal Carousel -->
-            <div id="hourly-timeline" class="flex space-x-4 overflow-x-auto scrollbar-none py-2">
-                <!-- Hourly cards injected via JS -->
+            <div id="hourly-timeline" class="flex space-x-3.5 overflow-x-auto scrollbar-none py-2 select-none">
+                <!-- 48 Hourly cards injected via JS -->
             </div>
         </div>
 
-        <!-- Bottom Grid: 7-Day Forecast & Lifestyle Insights -->
+        <!-- Interactive Weather Radar & Animated Map Section -->
+        <div class="bg-white/80 dark:bg-slate-800/50 border border-slate-200 dark:border-sky-800/40 rounded-3xl p-6 shadow-xl space-y-4 transition-colors">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-satellite-dish text-sky-500 dark:text-sky-400 text-sm"></i>
+                    <h3 class="text-base font-bold text-slate-900 dark:text-white">Interactive Weather Radar & Animated Map</h3>
+                </div>
+
+                <!-- Layer Switchers & Controls -->
+                <div class="flex flex-wrap items-center gap-2">
+                    <div class="flex items-center bg-slate-100 dark:bg-slate-900/80 border border-slate-300 dark:border-sky-700/40 rounded-xl p-1 text-xs font-semibold">
+                        <button id="layer-radar" class="px-3 py-1 rounded-lg bg-sky-500 text-white transition-all">Precipitation</button>
+                        <button id="layer-clouds" class="px-3 py-1 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all">Clouds</button>
+                    </div>
+
+                    <button id="map-recenter-btn" title="Re-center on Active City" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-900/80 hover:bg-sky-100 dark:hover:bg-sky-900/50 border border-slate-300 dark:border-sky-700/40 text-sky-600 dark:text-sky-400 text-xs">
+                        <i class="fa-solid fa-crosshairs"></i>
+                    </button>
+                    <button id="map-fullscreen-btn" title="Toggle Fullscreen" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-900/80 hover:bg-sky-100 dark:hover:bg-sky-900/50 border border-slate-300 dark:border-sky-700/40 text-slate-600 dark:text-slate-300 text-xs">
+                        <i class="fa-solid fa-expand"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Leaflet Map Container -->
+            <div id="weather-map" class="w-full h-80 sm:h-96 rounded-2xl overflow-hidden border border-slate-300 dark:border-sky-800/40 shadow-inner"></div>
+
+            <!-- Radar Playback & Timeline Controls -->
+            <div class="bg-slate-50 dark:bg-slate-900/70 border border-slate-200 dark:border-sky-800/30 rounded-2xl p-3.5 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div class="flex items-center space-x-2">
+                    <button id="radar-step-back" class="p-2 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs transition-colors" title="Previous Frame">
+                        <i class="fa-solid fa-backward-step"></i>
+                    </button>
+                    <button id="radar-play-pause" class="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-600 text-white text-xs font-bold flex items-center space-x-1.5 shadow-md shadow-sky-500/20 transition-all">
+                        <i id="radar-play-icon" class="fa-solid fa-play"></i>
+                        <span id="radar-play-text">Play Loop</span>
+                    </button>
+                    <button id="radar-step-forward" class="p-2 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs transition-colors" title="Next Frame">
+                        <i class="fa-solid fa-forward-step"></i>
+                    </button>
+                </div>
+
+                <!-- Scrubber Slider -->
+                <div class="flex-1 w-full flex items-center space-x-3 px-2">
+                    <input 
+                        type="range" 
+                        id="radar-time-slider" 
+                        min="0" 
+                        max="10" 
+                        value="0" 
+                        class="w-full h-2 bg-slate-300 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-sky-500"
+                    >
+                </div>
+
+                <!-- Frame Status Timestamp -->
+                <div class="flex items-center space-x-2 text-xs font-medium whitespace-nowrap">
+                    <span id="radar-frame-type" class="px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-600 dark:text-sky-300 font-bold uppercase text-[10px]">History</span>
+                    <span id="radar-frame-time" class="text-slate-600 dark:text-slate-300 font-mono">Loading radar...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Grid: 14-Day Forecast & Lifestyle Insights -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
-            <!-- 7-Day Extended Forecast (2 cols) -->
-            <div class="lg:col-span-2 bg-slate-800/50 border border-sky-800/40 rounded-3xl p-6 shadow-xl">
-                <div class="flex items-center space-x-2 mb-4">
-                    <i class="fa-solid fa-calendar-week text-sky-400 text-sm"></i>
-                    <h3 class="text-base font-bold text-white">7-Day Daily Outlook</h3>
+            <!-- 14-Day Extended Forecast with Accordion (2 cols) -->
+            <div class="lg:col-span-2 bg-white/80 dark:bg-slate-800/50 border border-slate-200 dark:border-sky-800/40 rounded-3xl p-6 shadow-xl transition-colors">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-solid fa-calendar-week text-sky-500 dark:text-sky-400 text-sm"></i>
+                        <h3 class="text-base font-bold text-slate-900 dark:text-white">14-Day Daily Outlook</h3>
+                    </div>
+                    <span class="text-xs text-slate-500 dark:text-slate-400">Click day for details</span>
                 </div>
-                <div id="daily-forecast-list" class="divide-y divide-slate-700/50">
-                    <!-- Daily rows injected via JS -->
+                <div id="daily-forecast-list" class="space-y-2">
+                    <!-- 14 Accordion rows injected via JS -->
                 </div>
             </div>
 
             <!-- Lifestyle & Practical Indices (1 col) -->
-            <div class="lg:col-span-1 bg-slate-800/50 border border-sky-800/40 rounded-3xl p-6 shadow-xl flex flex-col justify-between space-y-4">
+            <div class="lg:col-span-1 bg-white/80 dark:bg-slate-800/50 border border-slate-200 dark:border-sky-800/40 rounded-3xl p-6 shadow-xl flex flex-col justify-between space-y-4 transition-colors">
                 <div class="flex items-center space-x-2">
-                    <i class="fa-solid fa-heart-pulse text-rose-400 text-sm"></i>
-                    <h3 class="text-base font-bold text-white">Lifestyle & Activity</h3>
+                    <i class="fa-solid fa-heart-pulse text-rose-500 dark:text-rose-400 text-sm"></i>
+                    <h3 class="text-base font-bold text-slate-900 dark:text-white">Lifestyle & Activity</h3>
                 </div>
 
                 <div class="space-y-3">
                     <!-- Outdoor Running -->
-                    <div class="p-3.5 rounded-2xl bg-slate-800/90 border border-sky-900/40">
+                    <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-sky-900/40">
                         <div class="flex items-center justify-between">
-                            <span class="text-xs font-semibold text-slate-300"><i class="fa-solid fa-person-running text-sky-400 mr-1.5"></i> Running Index</span>
-                            <span id="running-rating" class="text-xs px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 font-bold">--</span>
+                            <span class="text-xs font-semibold text-slate-700 dark:text-slate-300"><i class="fa-solid fa-person-running text-sky-500 dark:text-sky-400 mr-1.5"></i> Running Index</span>
+                            <span id="running-rating" class="text-xs px-2 py-0.5 rounded bg-sky-500/20 text-sky-700 dark:text-sky-300 font-bold">--</span>
                         </div>
-                        <p id="running-summary" class="text-xs text-slate-400 mt-1.5">Calculating comfort score...</p>
+                        <p id="running-summary" class="text-xs text-slate-500 dark:text-slate-400 mt-1.5">Calculating comfort score...</p>
                     </div>
 
                     <!-- Car Wash -->
-                    <div class="p-3.5 rounded-2xl bg-slate-800/90 border border-sky-900/40">
+                    <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-sky-900/40">
                         <div class="flex items-center justify-between">
-                            <span class="text-xs font-semibold text-slate-300"><i class="fa-solid fa-car text-indigo-400 mr-1.5"></i> Car Wash</span>
-                            <span id="carwash-rating" class="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">--</span>
+                            <span class="text-xs font-semibold text-slate-700 dark:text-slate-300"><i class="fa-solid fa-car text-indigo-500 dark:text-indigo-400 mr-1.5"></i> Car Wash</span>
+                            <span id="carwash-rating" class="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold">--</span>
                         </div>
-                        <p id="carwash-summary" class="text-xs text-slate-400 mt-1.5">Evaluating rain risk...</p>
+                        <p id="carwash-summary" class="text-xs text-slate-500 dark:text-slate-400 mt-1.5">Evaluating rain risk...</p>
                     </div>
 
                     <!-- Sunburn Timer -->
-                    <div class="p-3.5 rounded-2xl bg-slate-800/90 border border-sky-900/40">
+                    <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-sky-900/40">
                         <div class="flex items-center justify-between">
-                            <span class="text-xs font-semibold text-slate-300"><i class="fa-solid fa-sun text-amber-400 mr-1.5"></i> Sun Safety</span>
-                            <span id="sun-timer" class="text-xs font-bold text-amber-300">-- mins to burn</span>
+                            <span class="text-xs font-semibold text-slate-700 dark:text-slate-300"><i class="fa-solid fa-sun text-amber-500 dark:text-amber-400 mr-1.5"></i> Sun Safety</span>
+                            <span id="sun-timer" class="text-xs font-bold text-amber-700 dark:text-amber-300">-- mins to burn</span>
                         </div>
-                        <p id="sun-recommendation" class="text-xs text-slate-400 mt-1.5">Checking UV radiation level...</p>
+                        <p id="sun-recommendation" class="text-xs text-slate-500 dark:text-slate-400 mt-1.5">Checking UV radiation level...</p>
                     </div>
                 </div>
 
-                <div class="pt-2 text-[11px] text-slate-500 text-center">
-                    Powered by Open-Meteo & Mosamiyan Engine
+                <div class="pt-2 text-[11px] text-slate-400 dark:text-slate-500 text-center">
+                    Powered by Open-Meteo & RainViewer Radar
                 </div>
             </div>
 

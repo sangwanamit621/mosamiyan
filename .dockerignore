@@ -22,8 +22,7 @@ ENV
 env
 
 # Secrets & Environment variables
-.env
-.env.*
+!.env
 !.env.example
 
 # Database & Local storage

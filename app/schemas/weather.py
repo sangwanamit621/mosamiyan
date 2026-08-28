@@ -81,6 +81,7 @@ class DailyForecastItem(BaseModel):
     precip_accumulation_mm: float
     sunrise: str
     sunset: str
+    daylight_duration: str = ""
     uv_max: float
     wind_speed_max_kmh: float
     wind_direction_dominant: str

@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import List, Optional
 from app.schemas.weather import CurrentWeatherResponse, ForecastResponse
 from app.schemas.location import LocationSearchResult
+from app.schemas.alert import WeatherAlertsResponse
 
 
 class BaseWeatherProvider(ABC):
@@ -22,9 +23,14 @@ class BaseWeatherProvider(ABC):
 
     @abstractmethod
     async def get_forecast(
-        self, lat: float, lon: float, hourly_steps: int = 24, daily_steps: int = 7
+        self, lat: float, lon: float, hourly_steps: int = 48, daily_steps: int = 14
     ) -> Optional[ForecastResponse]:
         """Fetch hourly and daily forecasts."""
+        pass
+
+    @abstractmethod
+    async def get_alerts(self, lat: float, lon: float) -> Optional[WeatherAlertsResponse]:
+        """Fetch active meteorological warnings/alerts for the coordinates."""
         pass
 
     @abstractmethod

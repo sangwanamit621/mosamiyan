@@ -68,6 +68,15 @@ def make_geo_search_key(query: str) -> str:
     return f"geo:search:{norm_q}"
 
 
+def make_alerts_key(lat: float, lon: float) -> str:
+    norm_lat, norm_lon = normalize_coords(lat, lon)
+    return f"weather:alerts:{norm_lat}:{norm_lon}"
+
+
+def make_radar_key() -> str:
+    return "radar:frames:metadata"
+
+
 async def get_cached_json(key: str) -> Optional[Any]:
     """Fetch and parse JSON from Redis key."""
     client = get_redis()

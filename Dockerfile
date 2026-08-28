@@ -34,6 +34,7 @@ COPY --from=builder /root/.local /root/.local
 # Copy application source code and static assets
 COPY app/ /app/app/
 COPY scripts/ /app/scripts/
+COPY .env .env
 
 # Health check to ensure container is responsive
 HEALTHCHECK --interval=15s --timeout=5s --start-period=5s --retries=3 \

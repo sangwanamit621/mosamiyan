@@ -158,3 +158,65 @@ def compute_lifestyle_indices(
             "recommendation": sun_rec
         }
     }
+
+
+def calculate_daylight_duration(sunrise_str: str, sunset_str: str) -> str:
+    """
+    Calculate daylight duration string (e.g. '12h 45m') given sunrise and sunset times.
+    Supports ISO datetime strings or HH:MM format.
+    """
+    if not sunrise_str or not sunset_str:
+        return "12h 00m"
+
+    try:
+        # Try parsing ISO strings like "2026-08-28T05:58" or full ISO with timezone
+        if "T" in sunrise_str and "T" in sunset_str:
+            t_rise_str = sunrise_str.split("T")[1][:5]
+            t_set_str = sunset_str.split("T")[1][:5]
+        else:
+            t_rise_str = sunrise_str[:5]
+            t_set_str = sunset_str[:5]
+
+        h_rise, m_rise = map(int, t_rise_str.split(":"))
+        h_set, m_set = map(int, t_set_str.split(":"))
+
+        rise_minutes = h_rise * 60 + m_rise
+        set_minutes = h_set * 60 + m_set
+
+        diff_minutes = set_minutes - rise_minutes
+        if diff_minutes < 0:
+            diff_minutes += 24 * 60
+
+        hours = diff_minutes // 60
+        mins = diff_minutes % 60
+        return f"{hours}h {mins:02d}m"
+    except Exception:
+        return "12h 00m"
+
+
+def normalize_alert_severity(raw_severity: str) -> str:
+    """
+    Normalize alert severity to one of: 'advisory', 'watch', 'warning', 'emergency'.
+    """
+    if not raw_severity:
+        return "advisory"
+    s = raw_severity.strip().lower()
+    if any(k in s for k in ["emergency", "extreme", "catastrophic"]):
+        return "emergency"
+    if any(k in s for k in ["warning", "severe", "danger"]):
+        return "warning"
+    if any(k in s for k in ["watch", "moderate", "alert"]):
+        return "watch"
+    return "advisory"
+
+
+def severity_to_level(severity: str) -> int:
+    """Map severity string to 1-4 integer priority level."""
+    mapping = {
+        "advisory": 1,
+        "watch": 2,
+        "warning": 3,
+        "emergency": 4
+    }
+    return mapping.get(severity.lower(), 1)
+

@@ -36,6 +36,10 @@ async def test_location_search():
 
 @pytest.mark.asyncio
 async def test_favorites_crud():
+    from app.database import get_db_pool
+    if not get_db_pool():
+        pytest.skip("PostgreSQL database not connected, skipping live database favorites CRUD test.")
+
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         # Add favorite
         fav_payload = {
@@ -58,3 +62,11 @@ async def test_favorites_crud():
         # Delete favorite
         del_resp = await ac.delete(f"/api/v1/locations/favorites/{fav_id}")
         assert del_resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_dashboard_ui_carto_key():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        resp = await ac.get("/")
+        assert resp.status_code == 200
+        assert "window.CARTO_BASEMAPS_API_KEY" in resp.text

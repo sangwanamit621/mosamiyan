@@ -1,11 +1,17 @@
 import logging
 from typing import List, Optional
+import time
 from app.config import get_settings
 from app.schemas.weather import CurrentWeatherResponse, ForecastResponse
+from app.schemas.alert import WeatherAlertsResponse
+from app.schemas.radar import RadarFrame, RadarMetadataResponse
+from app.services.http_client import get_http_client
 from app.services.cache_service import (
     get_cached_json,
+    make_alerts_key,
     make_current_weather_key,
     make_forecast_key,
+    make_radar_key,
     set_cached_json,
 )
 from app.services.providers.base_provider import BaseWeatherProvider
@@ -55,7 +61,7 @@ class WeatherService:
         c.temp_min = min_f
         c.temp_max = max_f
         c.dew_point = dew_f
-        c.wind.speed_kmh = speed_mph  # Field holds the unit value requested
+        c.wind.speed_kmh = speed_mph
         c.wind.gust_kmh = gust_mph
         c.visibility_km = vis_mi
         return data
@@ -105,7 +111,7 @@ class WeatherService:
         return None
 
     async def get_forecast(
-        self, lat: float, lon: float, hourly_steps: int = 24, daily_steps: int = 7, units: str = "metric"
+        self, lat: float, lon: float, hourly_steps: int = 48, daily_steps: int = 14, units: str = "metric"
     ) -> Optional[ForecastResponse]:
         cache_key = make_forecast_key(lat, lon, hourly_steps, daily_steps)
         cached_data = await get_cached_json(cache_key)
@@ -128,6 +134,83 @@ class WeatherService:
 
         logger.error(f"All weather providers failed for forecast ({lat}, {lon})")
         return None
+
+    async def get_alerts(self, lat: float, lon: float) -> Optional[WeatherAlertsResponse]:
+        cache_key = make_alerts_key(lat, lon)
+        cached_data = await get_cached_json(cache_key)
+
+        if cached_data:
+            response_obj = WeatherAlertsResponse.model_validate(cached_data)
+            response_obj.cached = True
+            return response_obj
+
+        # Multi-tier upstream failover for active alerts
+        for provider in self.providers:
+            try:
+                result = await provider.get_alerts(lat, lon)
+                if result:
+                    await set_cached_json(cache_key, result.model_dump(), self.settings.CACHE_TTL_ALERTS)
+                    result.cached = False
+                    return result
+            except Exception as e:
+                logger.warning(f"Provider {provider.name} failed during alerts fetch: {e}")
+
+        logger.info(f"No active alerts returned for coordinates ({lat}, {lon})")
+        return WeatherAlertsResponse(
+            location={"lat": lat, "lon": lon, "city": "Current Location"},
+            alerts_count=0,
+            alerts=[]
+        )
+
+    async def get_radar_frames(self) -> Optional[RadarMetadataResponse]:
+        cache_key = make_radar_key()
+        cached_data = await get_cached_json(cache_key)
+
+        if cached_data:
+            return RadarMetadataResponse.model_validate(cached_data)
+
+        try:
+            client = get_http_client()
+            resp = await client.get(self.settings.RAINVIEWER_API_URL, timeout=8.0)
+            if resp.status_code == 200:
+                data = resp.json()
+                host = data.get("host", "https://tilecache.rainviewer.com")
+                gen_at = int(data.get("generated", time.time()))
+
+                radar_dict = data.get("radar", {})
+                past_list = radar_dict.get("past", [])
+                nowcast_list = radar_dict.get("nowcast", [])
+
+                past_frames = [
+                    RadarFrame(time=int(item.get("time")), path=item.get("path"), type="past")
+                    for item in past_list if item.get("path")
+                ]
+                nowcast_frames = [
+                    RadarFrame(time=int(item.get("time")), path=item.get("path"), type="nowcast")
+                    for item in nowcast_list if item.get("path")
+                ]
+
+                response_obj = RadarMetadataResponse(
+                    host=host,
+                    generated_at=gen_at,
+                    past_frames=past_frames,
+                    nowcast_frames=nowcast_frames,
+                    color_scheme=2,
+                    smooth=1
+                )
+                await set_cached_json(cache_key, response_obj.model_dump(), self.settings.CACHE_TTL_RADAR)
+                return response_obj
+        except Exception as e:
+            logger.warning(f"RainViewer radar metadata fetch failed: {e}")
+
+        # Fallback empty structure
+        now_ts = int(time.time())
+        return RadarMetadataResponse(
+            host="https://tilecache.rainviewer.com",
+            generated_at=now_ts,
+            past_frames=[],
+            nowcast_frames=[]
+        )
 
 
 # Global singleton instance

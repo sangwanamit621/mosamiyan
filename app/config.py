@@ -28,14 +28,18 @@ class Settings(BaseSettings):
     DEFAULT_CITY: str = "New Delhi"
     DEFAULT_COUNTRY: str = "IN"
 
-    # Provider API Keys
+    # Provider API Keys & URLs
     OPENWEATHERMAP_API_KEY: Optional[str] = None
     WEATHERAPI_KEY: Optional[str] = None
+    CARTO_BASEMAPS_API_KEY: Optional[str] = None
+    RAINVIEWER_API_URL: str = "https://api.rainviewer.com/public/weather-maps.json"
 
     # Cache TTLs (seconds)
     CACHE_TTL_CURRENT: int = 300       # 5 minutes
     CACHE_TTL_HOURLY: int = 1800      # 30 minutes
     CACHE_TTL_DAILY: int = 3600       # 1 hour
+    CACHE_TTL_ALERTS: int = 120       # 2 minutes
+    CACHE_TTL_RADAR: int = 600        # 10 minutes
     CACHE_TTL_GEO: int = 86400        # 24 hours
 
     model_config = SettingsConfigDict(
